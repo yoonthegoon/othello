@@ -2,7 +2,7 @@ from typing import Self, cast
 
 from othello._typing import Direction, Passes, Player, Side, Space, State
 from othello.disk import Disk
-from othello.exceptions import GameOverError, IllegalSpaceError, UnownedSpaceError
+from othello.exceptions import GameOverError, IllegalSpaceError
 
 
 class Board:
@@ -90,14 +90,9 @@ class Board:
         :param space: space occupied by of one of two discs belonging to the current player
         :param direction: direction to search for chain of disks
         :return: list of spaces occupied by disks belonging to the other player
-        :raises UnownedSpaceError: if ``space`` is not owned by player
         """
 
         x, y = space
-        disk = self.grid[y][x]
-        if disk is None or disk.side != self.to_play:
-            raise UnownedSpaceError(f"space {space} not owned by player {self}")
-
         dir_x, dir_y = cast(tuple[int, int], direction.value)
         cur_x, cur_y = x + dir_x, y + dir_y
 
