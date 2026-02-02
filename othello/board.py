@@ -2,7 +2,7 @@ from typing import Self, cast
 
 from othello._typing import Direction, Passes, Player, Side, Space, State
 from othello.disk import Disk
-from othello.exceptions import GameOverError, IllegalSpaceError
+from othello.exceptions import GameOverError, IllegalSpaceError, UnownedSpaceError
 
 
 class Board:
@@ -20,17 +20,20 @@ class Board:
 
     @property
     def disc_counts(self) -> tuple[int, int]:
-        dark_pieces, light_pieces = 0, 0
+        """
+        :returns: ``(dark_count, light_count)``
+        """
+        dark_count, light_count = 0, 0
         for row in self.grid:
             for disk in row:
                 if disk is None:
                     continue
                 match disk.side:
                     case Side.DARK:
-                        dark_pieces += 1
+                        dark_count += 1
                     case Side.LIGHT:
-                        light_pieces += 1
-        return dark_pieces, light_pieces
+                        light_count += 1
+        return dark_count, light_count
 
     @property
     def legal_spaces(self) -> list[Space]:
@@ -47,6 +50,10 @@ class Board:
 
     @property
     def score(self) -> tuple[int, int] | None:
+        """
+        :returns: ``(dark_score, light_score)`` if the game is over, otherwise ``None``
+        """
+
         dark_count, light_count = self.disc_counts
         match self.winner:
             case Player.DARK:
@@ -59,11 +66,13 @@ class Board:
     def winner(self) -> Player | None:
         if self.state == State.NON_TERMINAL:
             return None
+
         dark_count, light_count = self.disc_counts
         if dark_count > light_count:
             return Player.DARK
         elif dark_count < light_count:
             return Player.LIGHT
+
         return None
 
     def alternate_players(self) -> Self:
@@ -75,7 +84,20 @@ class Board:
         return self
 
     def get_chain(self, space: Space, direction: Direction) -> list[Space]:
+        """
+        Get a list of spaces where a chain of disks belonging to the other player is sandwiched by two disks belonging to the current player with one disk being at the current space.
+
+        :param space: space occupied by of one of two discs belonging to the current player
+        :param direction: direction to search for chain of disks
+        :return: list of spaces occupied by disks belonging to the other player
+        :raises UnownedSpaceError: if ``space`` is not owned by player
+        """
+
         x, y = space
+        disk = self.grid[y][x]
+        if disk is None or disk.side != self.to_play:
+            raise UnownedSpaceError(f"space {space} not owned by player {self}")
+
         dir_x, dir_y = cast(tuple[int, int], direction.value)
         cur_x, cur_y = x + dir_x, y + dir_y
 
@@ -119,6 +141,17 @@ class Board:
         return False
 
     def play(self, space: Space) -> Self:
+        """
+        Play at given ``space``.
+        If there are no legal spaces, the turn is passed to the other player.
+        If both players pass one after another, the game is over.
+
+        :param space: space to play
+        :returns: ``self``
+        :raises GameOverError: if ``space`` is not legal to play in
+        :raises IllegalSpaceError: if ``space`` is not legal to play in
+        """
+
         if self.state == State.TERMINAL:
             raise GameOverError()
         if not self.legal_spaces:
